@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Ludum Dare 26: Minimalist Moe</title>
+    <meta charset="utf-8">
+    <meta name="description" content="Tiny God is a Tiny World game made for Ludum Dare 23">
+    <meta name="keywords" content="Tiny World, Ludum Dare, Tiny God, Game">
+    <meta name="author" content="David W Parker">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <!-- Le styles -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet"><!-- Style must be before responsive -->
+    <link href="css/bootstrap-responsive.min.css" rel="stylesheet">
+    <!--[if IE]>
+        <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+  </head>
+
+  <body>
+    <div id="container" class="container">
+      <div class="row">
+        <h1>Minimalist Moe</h1>
+      </div>
+      <div class="row">
+        <span id="log" class="error"></span>
+      </div>
+      <div id="game" class="row">
+      </div>
+    </div>
+  </body>
+
+  <!-- Shaders: Must come first for Loader -->
+  <script data-src="shaders/vertex.js" data-name="vert" class="shader-vertex" type="x-shader/x-vertex"></script>
+  <script data-src="shaders/vertex-tex.js" data-name="vert-t" class="shader-vertex" type="x-shader/x-vertex"></script>
+  <script data-src="shaders/fragment.js" data-name="frag" class="shader-fragment" type="x-shader/x-fragment"></script>
+  <script data-src="shaders/fragment-tex.js" data-name="frag-t" class="shader-fragment" type="x-shader/x-fragment"></script>
+
+  <!-- Libraries -->
+  <script type="text/javascript" src="js/lib/detector.js"></script>
+  <script type="text/javascript" src="js/lib/three.min.js"></script>
+  <script type="text/javascript" src="js/lib/stats.js"></script>
+  <script type="text/javascript" src="js/lib/jquery-1.9.0.min.js"></script>
+  <script type="text/javascript" src="js/lib/signals.js"></script>
+  <script type="text/javascript" src="js/lib/shaderLoader.js"></script>
+
+  <!-- MY CODE -->
+  <script type="text/javascript" src="js/game.js"></script>
+
+</html>
