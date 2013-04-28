@@ -1,25 +1,53 @@
 /**************************************
  * Copyright: David Parker
  * Ludum Dare 26: Minimalist Moe
+ *
+ * TODO:
+ *   add graphics
+ *   add sound
+ *   add more levels
+ *   add more shapes
+ *   fix (remove) fired shots after level complete
+ *   fix bounding box collision detection
  **************************************/
-/**
- * Returns a random number between min and max
- */
-function randomArbitrary(min, max) {
-    return Math.random() * (max - min) + min;
-}
-/**
- * Returns a random integer between min and max
- * Using Math.round() will give you a non-uniform distribution!
- */
-function randomInt (min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
 // Do everything after jQuery detects DOM is loaded
 $(document).ready(function() {
     // Check for webgl
     if (!Detector.webgl) Detector.addGetWebGLMessage();
+
+    // CONSTANTS
+    // States
+    var STATES = {
+        LOADING:"loading",  // before game
+        GAME:"game",        // during game
+        PAUSE:"pause",      // paused game
+        LEVEL:"level",      // between levels
+        GAMEOVER:"gameover",// game over (dead or win)
+    };
+    
+    // Enemy types
+    //    [life,damage,speed,radius,corners]
+    var ENEMIES = {
+        "triangle_easy":[10,0.02,3,20,3],
+        "triangle_med":[40,0.05,2,35,3],
+        "triangle_hard":[100,0.1,1,45,3],
+        "square_easy":[20,0.04,2.8,25,4],
+        "square_med":[70,0.08,1.6,35,4],
+        "square_hard":[140,0.14,1.1,50,4],
+    };
+
+    // Level data
+    var LEVELS = [
+        // index = level
+        // [[types, quantity]]
+        [["triangle_easy",5]],
+//        [["triangle_easy",5],["square_easy",5],["triangle_easy",10],["square_easy",10],["triangle_med",3]],
+//        [["triangle_easy",10],["square_easy",5],["triangle_med",3],["square_easy",10],["triangle_med",3],["square_easy",10],["triangle_hard",3]],
+//        [["square_easy",10],["triangle_med",5],["triangle_med",3],["square_easy",15],["triangle_hard",3],["square_med",5],["square_hard",2]],
+    ];
+    
+    // Audio
+    var explosionAudio;
 
     // Globals
     var $container=$("#game"), 
@@ -28,72 +56,28 @@ $(document).ready(function() {
     $pause=$("#pause"),
     $resume=$("#resume"),
     $reset=$("#reset"),
-    DEBUG=true,
-    mouse={x:0,y:0};
+    mouse={x:0,y:0},
+    DEBUG=true;
 
     // Universe
     var stats, camera, scene, projector, renderer, animID;
 
-    // States
-    var STATES = {
-        STATE_LOADING:"loading",  // before game
-        STATE_GAME:"game",        // during game
-        STATE_PAUSE:"pause",      // paused game
-        STATE_LEVEL:"level",      // between levels
-        STATE_GAMEOVER:"gameover",// game over
-    }
-    
-    // Enemy types
-    //    [life,damage,speed,radius,corners]
-    var ENEMIES = {
-        "triangle_easy":[20,0.02,3,20,3],
-        "triangle_med":[40,0.05,2,25,3],
-        "triangle_hard":[100,0.1,1,30,3],
-        "square_easy":[30,0.04,2.8,25,4],
-    }
-
-    // Level data
-    var LEVELS = [
-        // index = level
-        // [[types, quantity]]
-        // level 0= 3 waves, 5x triangle_easy, 3x triangle_med, 8x triangle_easy
-        //        [["triangle_easy",5],["triangle_med",3],["triangle_easy",8],["triangle_hard",1]],
-        [["triangle_easy",5],["square_easy",5]],
-        [["triangle_easy",5],["triangle_easy",5]],
-    ]
-
     // Minimalist Moe game object
     var MM;
 
-    // Buttons
+    /*
+     * Buttons clicks and event handlers
+     */
     $start.click(function() {startGame();return false;});
     $level.click(function() {nextLevel();return false;});
     $pause.click(function() {pauseGame();return false;});
     $resume.click(function(){resumeGame();return false;});
     $reset.click(function() {resetGame();return false;});
 
-    // Ensure shaders are loaded then start
-    SL.Shaders.loadedSignal.add(init);
-
-    /*
-     * INITIALIZATION
-     */
-    // All initialization should go here
-    function init() {
-        initSceneAndCamera();
-        initProjector();
-        initRenderer();
-        initStats();
-        initGame();
-    }
-
-    /*
-     * button event handlers
-     */
     function startGame() {
         $start.addClass("hide");
         $pause.removeClass("hide");
-        MM.state = STATES.STATE_GAME;
+        MM.state = STATES.GAME;
         registerEventListeners();
         addGameObjectsToScene();
         updateUI();
@@ -103,22 +87,23 @@ $(document).ready(function() {
     function nextLevel() {
         $level.addClass("hide");
         $pause.removeClass("hide");
-        MM.state = STATES.STATE_GAME;
+        MM.state = STATES.GAME;
         registerEventListeners();
         addGameObjectsToScene();
+        updateUI();
     }
 
     function pauseGame() {
         $pause.addClass("hide");
         $resume.removeClass("hide");
-        MM.state = STATES.STATE_PAUSE;
+        MM.state = STATES.PAUSE;
         unregisterEventListeners();
     }
     
     function resumeGame() {
         $resume.addClass("hide");
         $pause.removeClass("hide");
-        MM.state = STATES.STATE_GAME;
+        MM.state = STATES.GAME;
         registerEventListeners();
     }
 
@@ -127,30 +112,46 @@ $(document).ready(function() {
         $pause.addClass("hide");
         $resume.addClass("hide");
         MM.init();
+        updateUI();
         render();
         cancelAnimationFrame(animID);
         unregisterEventListeners();
     }
 
+    /*
+     * Game states
+     */
     function levelComplete() {
-        MM.state = STATES.STATE_LEVEL;
+        MM.state = STATES.LEVEL;
+        MM.wave = 1;
         MM.level++;
         MM.levelTotal = 0;
         MM.levelKills = 0;
         unregisterEventListeners();
+        // game over, you win
+        if (MM.level > LEVELS.length) {
+            gameover(true);
+            return;
+        }
         $level.removeClass("hide");
         $pause.addClass("hide");
         $resume.addClass("hide");
         render();
     }
 
-    function gameover() {
-        MM.state = STATES.STATE_GAMEOVER;
-        $("#game-life").text("DEAD!");
-        alert("Game Over! You had a total of " + MM.kills + " kill" + (MM.kills === 1 ? "." : "s."));
+    function gameover(win) {
+        MM.state = STATES.GAMEOVER;
+        var text = "";
+        if (win) text = "TOTAL VICTORY!!!";
+        else     text = "Moe is DEAD!";
+        $("#game-life").text(text);
+        alert(text + "\nYou had a total of " + MM.kills + " kill" + (MM.kills === 1 ? " " : "s ") + "for a total score of " + MM.score + "!");
         resetGame();
     }
 
+    /*
+     * Event listeners
+     */
     function registerEventListeners() {
 	document.addEventListener('mousedown', mouseDown, false);
     }
@@ -159,22 +160,56 @@ $(document).ready(function() {
         document.removeEventListener('mousedown', mouseDown, false);
     }
 
-    function initSceneAndCamera() {
+    /******
+     * Mouse functionality
+     ******/
+    function mouseDown(event) {
+	event.preventDefault();
+	mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+	mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+	var vector = new THREE.Vector3(mouse.x, mouse.y, 0.5);
+
+        // use raycaster to determine click position of bullet
+	projector.unprojectVector(vector, camera);
+        var direction = vector.sub(camera.position).normalize();
+	var ray = new THREE.Raycaster(camera.position, direction);
+        var distance = -camera.position.z / direction.z;
+        var pos = camera.position.clone().add(direction.multiplyScalar(distance));
+        createBullet(pos);
+    }
+
+    /*******************************************
+     * Start everything here!
+     *******************************************/
+    SL.Shaders.loadedSignal.add(init);
+
+    /*******************************************
+     * INITIALIZATION
+     *******************************************/
+    // All initialization should go here
+    function init() {
+        initAssets();
+        initSceneCameraProjectorRenderer();
+        initStats();
+        initGame();
+    }
+
+    function initAssets() {
+	setupLoad(new Audio(), "audio/Explosion2.wav", function(aud) {
+		explosionAudio = aud;
+	});
+    }
+
+    function initSceneCameraProjectorRenderer() {
         scene = new THREE.Scene();
         camera = new THREE.OrthographicCamera(
             $container.width()/-2,$container.width()/2,
             $container.height()/2,$container.height()/-2,
-            0,101 // no depth
+            0,101 // no real depth, just for camera depth (helps with raycasting)
         );
         camera.position.set(0,0,100);
         scene.add(camera);
-    }
-
-    function initProjector() {
 	projector = new THREE.Projector();
-    }
-
-    function initRenderer() {
         renderer = new THREE.WebGLRenderer();
         renderer.setSize($container.width(), $container.height());
         $container.append(renderer.domElement);
@@ -189,7 +224,7 @@ $(document).ready(function() {
         }
     }
 
-    // initializes the game and all objects required for the game
+    // initializes the game and house and moe objects required for the game
     function initGame() {
         MM = MM || {
             enemies:[],
@@ -202,9 +237,11 @@ $(document).ready(function() {
             },
 
             reset: function() {
-                this.state = STATES.STATE_LOADING;
+                this.state = STATES.LOADING;
                 this.life = 100;
-                this.level = 0;
+                this.score = 0;
+                this.level = 1;
+                this.wave = 1;
                 this.levelKills = 0;
                 this.levelTotal = 0;
                 this.kills = 0;
@@ -268,6 +305,10 @@ $(document).ready(function() {
         }.init();
     }
 
+    /*******************************************
+     * Object creation (enemies, bullets)
+     *******************************************/
+    // Adds all game objects (non-bullets) to the scene
     function addGameObjectsToScene() {
         // background objects
         scene.add(MM.home.mesh);
@@ -276,31 +317,7 @@ $(document).ready(function() {
         scene.add(MM.moe.mesh);
 
         // enemies
-        // == level,wave,[enemy,number]
-        //    LEVELS[0][0][0] // enemy
-        //    LEVELS[0][0][1] // number
-        var waves = LEVELS[MM.level];
-        MM.levelTotal = 0;
-        // for every wave
-        for (var i=0; i<waves.length; i++) {
-            var wave = waves[i];            // wave data [enemy,number]
-            MM.levelTotal += wave[1];
-            for (var j=0; j<wave[1]; j++) {
-                // get the enemy type for that level
-                var enemy = ENEMIES[wave[0]];
-                var randT = randomArbitrary(-1,1); //(random +/- for rotation)
-                var xSpace = getRandomXSpacing(i,wave[1],j);
-                var ySpace = getRandomYSpacing();
-                if (ySpace > 0) {
-                } else if (ySpace < 0) {
-                }
-                var pos = new THREE.Vector3(xSpace,ySpace,0.0);
-
-                 // createEnemy(pos,rot,life,damage,speed,radius,corners)
-                 createEnemy(pos,randT,enemy);
-            }
-        }
-
+        getEnemiesForLevel(LEVELS[MM.level-1]); // level is 1-based
         for (var i=0; i<MM.enemies.length; i++) {
             if (MM.enemies[i].active === true) {
                 scene.add(MM.enemies[i].mesh);
@@ -308,39 +325,62 @@ $(document).ready(function() {
         }
     }
 
-    function getRandomXSpacing(waveNumber,inWave,enemyNumber) {
-        var startSpace = $container.width()-100;
-        var minXSpace = 75;
-        var waveSpace = 250;
-        return startSpace+ minXSpace*waveNumber + waveSpace*enemyNumber;
+    function getEnemiesForLevel(waves) {
+        // == level,wave,[enemy,number]
+        //    LEVELS[0][0][0] // enemy
+        //    LEVELS[0][0][1] // number
+        MM.levelTotal = 0; // total number of enemies on level
+
+        // for every wave
+        for (var i=0; i<waves.length; i++) {
+            var wave = waves[i];            // wave data [enemy,number]
+            MM.levelTotal += wave[1];
+
+            // for every singel enemy in the wave
+            for (var j=0; j<wave[1]; j++) {
+
+                // get the enemy type for that level
+                var enemy = ENEMIES[wave[0]],
+                rot = randomArbitrary(-1,1), // random +/- for rotation
+                rotB = randomArbitrary(0,1), // does rotate?
+
+                // get random x and y spacing and create position
+                xSpace = getRandomXSpacing(i,waves,j),
+                ySpace = getRandomYSpacing(),
+                pos = new THREE.Vector3(xSpace,ySpace,0.0);
+
+                // create it based on data
+                createEnemy(pos,rot,rotB,enemy,i+1);
+            }
+        }
+    }
+    
+    function getRandomXSpacing(waveNumber,waves,enemyNumber) {
+        var inWave = 1,
+        startSpace = $container.width()-150,
+        minXSpace = 75;
+        if (waveNumber > 0) inWave = waves[waveNumber-1][1]; // number from previous
+        if (inWave > 8) inWave = 8;                          // max
+        var waveSpace = inWave*minXSpace+150;
+        return startSpace+ minXSpace*enemyNumber + waveSpace*waveNumber;
     }
 
     function getRandomYSpacing() {
-        var rand = randomArbitrary(-1,1); // top/bottom
-        var randSpace = randomInt(0,5);
+        var rand = randomArbitrary(0,1); // top/bottom
+        var randSpace = randomInt(1,5);
         var minYSpace = 50;
-        return minYSpace*randSpace*rand;
+        var by = 0; // 10%
+        if (rand > 0.55)      by = 1;  // 45%
+        else if (rand < 0.46) by = -1; // 45%
+        var ySpace = minYSpace*randSpace*by;
+        if      (ySpace < 0-$container.height()/2+20) ySpace = 0-$container.height()/2+20;
+        else if (ySpace >  +$container.height()/2-20) ySpace =  +$container.height()/2-20;
+        return ySpace;
     }
 
-    /******
-     * Mouse functionality
-     ******/
-    function mouseDown(event) {
-	event.preventDefault();
-	mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-	mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-	var vector = new THREE.Vector3(mouse.x, mouse.y, 0.5);
-
-        // use raycaster to determine vector of bullet
-	projector.unprojectVector(vector, camera);
-        var direction = vector.sub(camera.position).normalize();
-	var ray = new THREE.Raycaster(camera.position, direction);
-        var distance = -camera.position.z / direction.z;
-        var pos = camera.position.clone().add(direction.multiplyScalar(distance));
-        createBullet(pos);
-    }
-
-    // bullets
+    /*******************************************
+     * bullets
+     *******************************************/
     function createBullet(pos) {
         var b = {
             "name":"bullet",
@@ -376,68 +416,79 @@ $(document).ready(function() {
                         return;
                     }
 
-                    /*
-                      collision detection:
-                      -- poor man collision checking origin of bullet with bounding box of
-                      -- enemy plus radius instead of the ray... 
-                      -- Three.js intersection isn't being very good at the moment.
-                    */
-                    // iterate active enemies
+                    // iterate enemies
                     for (var j=0; j<MM.enemies.length;j++) {
                         var enemy = MM.enemies[j];
+
+                        // only active enemies
                         if (enemy.active) {
                             var bb = enemy.geometry.boundingBox;
-                            var hit = false;
+
+                            /*
+                              collision detection:
+                              -- poor man collision checking origin of bullet with bounding box of
+                              -- enemy plus radius instead of the ray... 
+                              -- Three.js intersection isn't being very good at the moment.
+                            */
                             if (this.mesh.position.x < enemy.mesh.position.x+bb.max.x+this.radius/2 &&
                                 this.mesh.position.x > enemy.mesh.position.x+bb.min.x-this.radius/2 &&
                                 this.mesh.position.y < enemy.mesh.position.y+bb.max.y+this.radius/2 &&
                                 this.mesh.position.y > enemy.mesh.position.y+bb.min.y-this.radius/2) {
-                                hit = true;
-                            }
 
-                            if (hit) {
-                                // decrement life
+                                // hit something!
+                                // decrement life and check if killed
                                 enemy.life -= this.damage;
+				explosionAudio.play();
                                 if (enemy.life <= 0) {
-                                    enemy.reset();
+                                    MM.score += enemy.totalLife;
                                     ++MM.kills;
                                     ++MM.levelKills;
+                                    enemy.reset();
                                     updateUI();
 
                                     // if killed last enemy on level
-                                    if (MM.levelKills === MM.levelTotal) {
-                                        levelComplete();
-                                    }
+                                    if (MM.levelKills === MM.levelTotal) levelComplete();
                                 }
 
                                 // remove bullet
                                 this.reset();
                                 break;
-                            }
+                            } // collision detection
                         } // active enemy
-                    } // for loop
+                    } // for enemies loop
                 } // active bullet
-            }, // update
 
+                else {
+                    this.reset();
+                }
+            }, // update
             reset: function() {
                 this.active = false;
                 scene.remove(this.mesh)
             }
-
         }.init();
+        return b;
     }
 
-    function createEnemy(pos,rot,enemy) {
+    /*******************************************
+     * Enemy
+     *******************************************/
+    function createEnemy(pos,rot,rotB,enemy,wave) {
         var e = {
             "name":"enemy",
             "active":true,
             "pos":pos,
             "rot":rot,
+            "rotB":rotB,
+            "totalLife":enemy[0],
             "life":enemy[0],
             "damage":enemy[1],
             "speed":enemy[2],
             "radius":enemy[3],
             "corners":enemy[4],
+            "wave":wave,
+
+            // initialize an enemy
             init: function() {
                 this.geometry = new THREE.CircleGeometry(this.radius,this.corners);
                 this.material = new THREE.MeshBasicMaterial({color:0x00ff00,wireframe:false});
@@ -447,39 +498,56 @@ $(document).ready(function() {
                 this.homeside = 0-$container.width()/2+MM.home.width+this.radius/2,
                 MM.enemies.push(this);
             },
-            update: function() {
-                if (this.active === true) {
-                    this.mesh.position.x -= this.speed;
-                    this.mesh.rotation.z += (this.rot > 0 ? 0.01 : -0.01);
 
-                    // check if hitting home
+            // update and do position stuff
+            update: function() {
+
+                // active enemies only
+                if (this.active === true) {
+
+                    // move and rotate
+                    this.mesh.position.x -= this.speed;
+                    if (this.rotB >= 0.3) this.mesh.rotation.z += (this.rot > 0 ? 0.01 : -0.01);
+
+                    // check if hitting home, stop moving if so
                     if (this.mesh.position.x <= this.homeside) {
                         this.mesh.position.x = this.homeside;
+
+                        // we are hit, take damage and update UI
                         MM.life -= this.damage;
                         updateUI();
 
                         // check if dead
-                        if (MM.life <= 0) {
-                            gameover();
-                        }
-                        return;
+                        if (MM.life <= 0) gameover(false);
+                    }
+
+                    // check for upcoming wave
+                    if (this.mesh.position.x < $container.width()/2+200 &&
+                        this.wave > MM.wave) {
+                        MM.wave = this.wave;
+                        updateUI();
                     }
                 } // active enemy
+                
+                else {
+                    this.reset();
+                }
             },
             reset: function() {
                 this.active = false;
                 scene.remove(this.mesh)
             }
         }.init();
+        return e;
     }
 
     /**********
      * animation, updating, and rendering
      **********/
+    // animate as long as in game state
     function animate() {
         animID = requestAnimationFrame(animate);
-        //	handleKeys();           
-        if (MM.state === STATES.STATE_GAME) {
+        if (MM.state === STATES.GAME) {
             update();
 	    render();
         }
@@ -487,6 +555,7 @@ $(document).ready(function() {
         if (DEBUG) stats.update();
     }
 
+    // update game objects
     function update() {
         // update active enemy objects
         for (var i=0; i<MM.enemies.length; i++) {
@@ -499,10 +568,15 @@ $(document).ready(function() {
         }
     }
 
+    // update user information
     function updateUI() {
         $("#game-life").text(Math.round(MM.life) + "%");
+        $("#game-level").text(MM.level);
+        if (MM.levelTotal > 0) $("#game-percent").text(Math.round(MM.levelKills/MM.levelTotal*100) + "%");
+        else                   $("#game-percent").text("0%");
+        $("#game-wave").text(MM.wave);
         $("#game-kills").text(MM.kills);
-        $("#percent").text(Math.round(MM.levelKills/MM.levelTotal*100) + "%");
+        $("#game-score").text(MM.score);
     }
 
     // render the scene!

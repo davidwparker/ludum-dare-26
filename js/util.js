@@ -1,100 +1,44 @@
-/**********
- * Utility for class inheritance
- **********/
-/* Simple JavaScript Inheritance
- * By John Resig http://ejohn.org/
- * MIT Licensed.
+/**
+ * Nice setupLoad via Rainbow.js
  */
-// Inspired by base2 and Prototype
-(function(){
-  var initializing = false, fnTest = /xyz/.test(function(){xyz;}) ? /\b_super\b/ : /.*/;
- 
-  // The base Class implementation (does nothing)
-  this.Class = function(){};
- 
-  // Create a new Class that inherits from this class
-  Class.extend = function(prop) {
-    var _super = this.prototype;
-   
-    // Instantiate a base class (but only create the instance,
-    // don't run the init constructor)
-    initializing = true;
-    var prototype = new this();
-    initializing = false;
-   
-    // Copy the properties over onto the new prototype
-    for (var name in prop) {
-      // Check if we're overwriting an existing function
-      prototype[name] = typeof prop[name] == "function" &&
-        typeof _super[name] == "function" && fnTest.test(prop[name]) ?
-        (function(name, fn){
-          return function() {
-            var tmp = this._super;
-           
-            // Add a new ._super() method that is the same method
-            // but on the super-class
-            this._super = _super[name];
-           
-            // The method only need to be bound temporarily, so we
-            // remove it when we're done executing
-            var ret = fn.apply(this, arguments);        
-            this._super = tmp;
-           
-            return ret;
-          };
-        })(name, prop[name]) :
-        prop[name];
-    }
-   
-    // The dummy class constructor
-    function Class() {
-      // All construction is actually done in the init method
-      if ( !initializing && this.init )
-        this.init.apply(this, arguments);
-    }
-   
-    // Populate our constructed prototype object
-    Class.prototype = prototype;
-   
-    // Enforce the constructor to be what we expect
-    Class.prototype.constructor = Class;
- 
-    // And make this class extendable
-    Class.extend = arguments.callee;
-   
-    return Class;
-  };
-})();
+function setupLoad(asset, src, callback) {
+    var pendingAssets, totalAssets;
+    ++pendingAssets;
+    ++totalAssets;
 
-/**********
- * My Classes, uses Class utility class for providing inheritance syntax
- **********/
-var MMObj = Class.extend({
-    init: function(mesh,geometry,material) {
-	this._mesh = mesh;
-	this._geometry = geometry;
-        this._material = material;
-    },
-    mesh: function(x) {
-        if (x) this._mesh = x;
-        return this._mesh;
-    },
-    geometry: function(x) {
-        if (x) this._geometry = x;
-        return this._geometry;
-    },
-    material: function(x) {
-        if (x) this._material = x;
-        return this._material;
+    var loadInfo = [0];
+    function loaded() {
+	callback(asset);
+	if (loadInfo[0] == 0) {
+	    --pendingAssets;
+	    if (pendingAssets <= 0) {
+		stateFadeOut = true;
+	    }
+	    loadInfo[0] = 1;
+	}
     }
-});
+    if (asset.play) {
+	asset.addEventListener('canplaythrough', loaded);
+    } else {
+	asset.onload = loaded;
+    }
+    asset.onerror = function() {
+	alert("Failed to load " + src);
+    }
+    asset.src = src;
+}
 
-var MMEnemy = MMObj.extend({
-    init: function(life) {
-        this._life = life;
-    },
-    life: function(x) {
-        if (x) this._life = x;
-        return this._life;
-    }
-});
+/**
+ * Returns a random number between min and max
+ */
+function randomArbitrary(min, max) {
+    return Math.random() * (max - min) + min;
+}
+
+/**
+ * Returns a random integer between min and max
+ * Using Math.round() will give you a non-uniform distribution!
+ */
+function randomInt (min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}

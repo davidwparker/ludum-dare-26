@@ -25,12 +25,17 @@
       <div id="game-data" class="row">
         <div class="span3">
           Life: <span id="game-life"></span><br />
+          Level: <span id="game-level"></span>
+        </div>
+        <div class="span3">
+          % wave complete: <span id="game-percent"></span><br />
+          Wave #: <span id="game-wave"></span>
+        </div>
+        <div class="span3">
+          Score: <span id="game-score"></span><br />
           Crazy Angles destroyed: <span id="game-kills"></span>
         </div>
         <div class="span3">
-          % wave complete: <span id="percent"></span>
-        </div>
-        <div class="span6">
           <a id="start" href="#" class="btn">Start Game</a>
           <a id="level" href="#" class="btn hide">Next Level</a>
           <a id="pause" href="#" class="btn hide">Pause</a>
@@ -61,6 +66,7 @@
   <script type="text/javascript" src="js/lib/shaderLoader.js"></script>
 
   <!-- MY CODE -->
+  <script type="text/javascript" src="js/util.js"></script>
   <script type="text/javascript" src="js/game.js"></script>
 
 </html>
