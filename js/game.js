@@ -47,7 +47,7 @@ $(document).ready(function() {
     ];
     
     // Audio
-    var explosionAudio;
+    var mute=false, explosionAudio=[null,null,null,null,null], nextExplosion=0;
 
     // Globals
     var $container=$("#game"), 
@@ -56,6 +56,7 @@ $(document).ready(function() {
     $pause=$("#pause"),
     $resume=$("#resume"),
     $reset=$("#reset"),
+    $mute=$("#mute"),
     mouse={x:0,y:0},
     DEBUG=true;
 
@@ -73,6 +74,7 @@ $(document).ready(function() {
     $pause.click(function() {pauseGame();return false;});
     $resume.click(function(){resumeGame();return false;});
     $reset.click(function() {resetGame();return false;});
+    $mute.click(function() {muteGame();return false;});
 
     function startGame() {
         $start.addClass("hide");
@@ -116,6 +118,12 @@ $(document).ready(function() {
         render();
         cancelAnimationFrame(animID);
         unregisterEventListeners();
+    }
+    
+    function muteGame() {
+        if (mute) $mute.text("Mute");
+        else      $mute.text("Unmute");
+        mute = !mute;
     }
 
     /*
@@ -178,6 +186,19 @@ $(document).ready(function() {
         createBullet(pos);
     }
 
+    /******
+     * Audio functionality
+     ******/
+    function playExplosion() {
+        if (!mute) {
+	    explosionAudio[nextExplosion].pause();
+	    explosionAudio[nextExplosion].currentTime = 0.0;
+	    explosionAudio[nextExplosion].volume = 0.7 + Math.random() * 0.1;
+	    explosionAudio[nextExplosion].play();
+	    nextExplosion = (nextExplosion + 1) % explosionAudio.length;
+        }
+    }
+
     /*******************************************
      * Start everything here!
      *******************************************/
@@ -195,8 +216,20 @@ $(document).ready(function() {
     }
 
     function initAssets() {
+	setupLoad(new Audio(), "audio/Explosion1.wav", function(aud) {
+		explosionAudio[0] = aud;
+	});
 	setupLoad(new Audio(), "audio/Explosion2.wav", function(aud) {
-		explosionAudio = aud;
+		explosionAudio[1] = aud;
+	});
+	setupLoad(new Audio(), "audio/Explosion3.wav", function(aud) {
+		explosionAudio[2] = aud;
+	});
+	setupLoad(new Audio(), "audio/Explosion4.wav", function(aud) {
+		explosionAudio[3] = aud;
+	});
+	setupLoad(new Audio(), "audio/Explosion5.wav", function(aud) {
+		explosionAudio[4] = aud;
 	});
     }
 
@@ -438,7 +471,7 @@ $(document).ready(function() {
                                 // hit something!
                                 // decrement life and check if killed
                                 enemy.life -= this.damage;
-				explosionAudio.play();
+                                playExplosion();
                                 if (enemy.life <= 0) {
                                     MM.score += enemy.totalLife;
                                     ++MM.kills;
