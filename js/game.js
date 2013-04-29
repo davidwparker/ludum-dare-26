@@ -3,10 +3,9 @@
  * Ludum Dare 26: Minimalist Moe
  *
  * TODO:
- *   add graphics
- *   add sound
- *   add more levels
- *   add more shapes
+ *   add graphics -> http://glsl.heroku.com/e#8379.0
+ *   add sound -> started...
+ *   add more levels...
  *   fix (remove) fired shots after level complete
  *   fix bounding box collision detection
  **************************************/
@@ -14,6 +13,9 @@
 $(document).ready(function() {
     // Check for webgl
     if (!Detector.webgl) Detector.addGetWebGLMessage();
+
+    // DEBUG
+    var DEBUG=false;
 
     // CONSTANTS
     // States
@@ -34,22 +36,33 @@ $(document).ready(function() {
         "square_easy":[20,0.04,2.8,25,4],
         "square_med":[70,0.08,1.6,35,4],
         "square_hard":[140,0.14,1.1,50,4],
+        "penta_easy":[40,0.05,4,40,5],
+        "penta_med":[100,0.18,2.6,45,5],
+        "penta_hard":[300,0.4,1.9,50,5],
+        "hex_easy":[80,0.12,2.5,45,6],
+        "hex_med":[150,0.24,2.0,50,6],
+        "hex_hard":[400,0.6,1.5,60,6],
     };
 
     // Level data
     var LEVELS = [
         // index = level
         // [[types, quantity]]
-        [["triangle_easy",5]],
-//        [["triangle_easy",5],["square_easy",5],["triangle_easy",10],["square_easy",10],["triangle_med",3]],
-//        [["triangle_easy",10],["square_easy",5],["triangle_med",3],["square_easy",10],["triangle_med",3],["square_easy",10],["triangle_hard",3]],
-//        [["square_easy",10],["triangle_med",5],["triangle_med",3],["square_easy",15],["triangle_hard",3],["square_med",5],["square_hard",2]],
+        [["triangle_easy",10],["square_easy",5],["triangle_med",3],["square_hard",5]],
+        [["square_easy",10],["triangle_med",5],["triangle_med",3],["triangle_hard",3],["square_med",5],["square_hard",2]],
+        [["square_med",6],["penta_easy",5],["penta_med",3],["square_hard",5],["hex_easy",2],["penta_med",5],["penta_hard",2]],
+        [["square_hard",6],["penta_med",5],["penta_hard",3],["square_hard",1],["hex_easy",2],["hex_med",5],["hex_hard",1]],
+        [["penta_easy",6],["penta_med",5],["penta_hard",5],["hex_med",5],["hex_hard",2],["penta_hard",10],["hex_hard",3]],
+        [["penta_easy",20],["hex_easy",15],["penta_med",10],["penta_hard",5],["hex_med",5],["hex_hard",5]],
     ];
     
     // Audio
     var mute=false, explosionAudio=[null,null,null,null,null], nextExplosion=0;
 
-    // Globals
+    // Images
+    var imgMoe = THREE.ImageUtils.loadTexture("img/moe-smile.png");
+
+    // UI
     var $container=$("#game"), 
     $start=$("#start"),
     $level=$("#level"),
@@ -57,8 +70,7 @@ $(document).ready(function() {
     $resume=$("#resume"),
     $reset=$("#reset"),
     $mute=$("#mute"),
-    mouse={x:0,y:0},
-    DEBUG=true;
+    mouse={x:0,y:0};
 
     // Universe
     var stats, camera, scene, projector, renderer, animID;
@@ -191,10 +203,13 @@ $(document).ready(function() {
      ******/
     function playExplosion() {
         if (!mute) {
-	    explosionAudio[nextExplosion].pause();
-	    explosionAudio[nextExplosion].currentTime = 0.0;
-	    explosionAudio[nextExplosion].volume = 0.7 + Math.random() * 0.1;
-	    explosionAudio[nextExplosion].play();
+            // not loading assets properly yet...
+            if (explosionAudio[nextExplosion] !== null) {
+	        explosionAudio[nextExplosion].pause();
+	        explosionAudio[nextExplosion].currentTime = 0.0;
+	        explosionAudio[nextExplosion].volume = 0.7 + Math.random() * 0.1;
+	        explosionAudio[nextExplosion].play();
+            }
 	    nextExplosion = (nextExplosion + 1) % explosionAudio.length;
         }
     }
@@ -202,7 +217,7 @@ $(document).ready(function() {
     /*******************************************
      * Start everything here!
      *******************************************/
-    SL.Shaders.loadedSignal.add(init);
+    init();
 
     /*******************************************
      * INITIALIZATION
@@ -217,19 +232,19 @@ $(document).ready(function() {
 
     function initAssets() {
 	setupLoad(new Audio(), "audio/Explosion1.wav", function(aud) {
-		explosionAudio[0] = aud;
+	    explosionAudio[0] = aud;
 	});
 	setupLoad(new Audio(), "audio/Explosion2.wav", function(aud) {
-		explosionAudio[1] = aud;
+	    explosionAudio[1] = aud;
 	});
 	setupLoad(new Audio(), "audio/Explosion3.wav", function(aud) {
-		explosionAudio[2] = aud;
+	    explosionAudio[2] = aud;
 	});
 	setupLoad(new Audio(), "audio/Explosion4.wav", function(aud) {
-		explosionAudio[3] = aud;
+	    explosionAudio[3] = aud;
 	});
 	setupLoad(new Audio(), "audio/Explosion5.wav", function(aud) {
-		explosionAudio[4] = aud;
+	    explosionAudio[4] = aud;
 	});
     }
 
@@ -311,7 +326,7 @@ $(document).ready(function() {
                     "width":100,
                     init: function(_this) {
                         this.geometry = new THREE.PlaneGeometry(this.width, this.height, 1, 1);
-                        this.material = new THREE.MeshBasicMaterial({color:0xff0000, wireframe:false});
+                        this.material = new THREE.MeshBasicMaterial({color:0x5C5C5C, wireframe:false});
                         this.mesh = new THREE.Mesh(this.geometry, this.material);
                         this.mesh.position.set(this.pos.x+this.width/2,this.pos.y,-1);
                         _this.home = this;
@@ -328,7 +343,7 @@ $(document).ready(function() {
                     "radius":50,
                     "init": function(_this) {
                         this.geometry = new THREE.CircleGeometry(this.radius,32);
-                        this.material = new THREE.MeshBasicMaterial({color:0x000000, wireframe:true});
+		        this.material = new THREE.MeshBasicMaterial({map:imgMoe});
                         this.mesh = new THREE.Mesh(this.geometry, this.material);
                         this.mesh.position.set(this.pos.x+this.radius,this.pos.y,0);
                         _this.moe = this;
@@ -506,6 +521,33 @@ $(document).ready(function() {
     /*******************************************
      * Enemy
      *******************************************/
+    function randomHex() {
+        var r = randomInt(0,15);
+        if (r === 10) 
+            r = "a";
+        else if (r === 11)
+            r = "b";
+        else if (r === 12)
+            r = "c";
+        else if (r === 13)
+            r = "d";
+        else if (r === 14)
+            r = "e";
+        else if (r === 15)
+            r = "f";
+        return r;
+    }
+    function randomRGB() {
+        var r1 = randomHex(),
+        r2 = randomHex(),
+        g1 = randomHex(),
+        g2 = randomHex(),
+        b1 = randomHex(),
+        b2 = randomHex(),
+        color = "#"+r1+r2+g1+g2+b1+b2;
+        return color;
+    }
+    
     function createEnemy(pos,rot,rotB,enemy,wave) {
         var e = {
             "name":"enemy",
@@ -524,7 +566,7 @@ $(document).ready(function() {
             // initialize an enemy
             init: function() {
                 this.geometry = new THREE.CircleGeometry(this.radius,this.corners);
-                this.material = new THREE.MeshBasicMaterial({color:0x00ff00,wireframe:false});
+                this.material = new THREE.MeshBasicMaterial({color:randomRGB(),wireframe:false});
                 this.mesh = new THREE.Mesh(this.geometry, this.material);
                 this.mesh.position.set(this.pos.x,this.pos.y,0);
                 this.geometry.computeBoundingBox();

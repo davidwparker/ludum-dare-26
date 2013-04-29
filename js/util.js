@@ -1,8 +1,5 @@
-/**
- * Nice setupLoad via Rainbow.js
- */
 function setupLoad(asset, src, callback) {
-    var pendingAssets, totalAssets;
+    var pendingAssets=0,totalAssets=0;
     ++pendingAssets;
     ++totalAssets;
 
@@ -12,7 +9,7 @@ function setupLoad(asset, src, callback) {
 	if (loadInfo[0] == 0) {
 	    --pendingAssets;
 	    if (pendingAssets <= 0) {
-		stateFadeOut = true;
+                // this is where I would be done...
 	    }
 	    loadInfo[0] = 1;
 	}
@@ -27,7 +24,6 @@ function setupLoad(asset, src, callback) {
     }
     asset.src = src;
 }
-
 /**
  * Returns a random number between min and max
  */
