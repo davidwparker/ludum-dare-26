@@ -20,7 +20,7 @@ function setupLoad(asset, src, callback) {
 	asset.onload = loaded;
     }
     asset.onerror = function() {
-	alert("Failed to load " + src);
+        //	alert("Failed to load " + src);
     }
     asset.src = src;
 }
