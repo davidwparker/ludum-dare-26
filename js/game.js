@@ -63,7 +63,9 @@ $(document).ready(function() {
     var imgMoe = THREE.ImageUtils.loadTexture("img/moe-smile.png");
 
     // UI
-    var $container=$("#game"), 
+    var $container=$("#game"),
+    containerWidth=1200+600,
+    containerHeight=500+200,
     $start=$("#start"),
     $level=$("#level"),
     $pause=$("#pause"),
@@ -185,8 +187,8 @@ $(document).ready(function() {
      ******/
     function mouseDown(event) {
 	event.preventDefault();
-	mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-	mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+	mouse.x = (event.clientX / containerWidth) * 2 - 1;
+	mouse.y = - (event.clientY / containerHeight) * 2 + 1;
 	var vector = new THREE.Vector3(mouse.x, mouse.y, 0.5);
 
         // use raycaster to determine click position of bullet
